@@ -135,6 +135,10 @@ impl MemoryManager {
             // create a larger writable buffer
             let mut new_buffer = MutableBuffer::new(self.execbuffer_size).expect("Could not allocate a larger buffer");
             new_buffer.set_len(new_asmoffset);
+            
+
+            #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+            new_buffer.jit_writable();
 
             // copy over the data
             new_buffer[.. old_asmoffset].copy_from_slice(&self.execbuffer.read().unwrap());
@@ -147,17 +151,23 @@ impl MemoryManager {
             // resynchronize the entire buffer
             cache_control::synchronize_icache(&new_buffer);
 
+            // repack the buffer
+            #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+            new_buffer.jit_executable();
+
             // swap the buffers
             self.execbuffer_addr = new_buffer_addr;
             *self.execbuffer.write().unwrap() = new_buffer.make_exec().expect("Could not swap buffer protection modes")
 
         } else {
-
             // temporarily change the buffer protection modes and copy in new data
             let mut lock = self.write();
             let buffer = mem::replace(&mut *lock, ExecutableBuffer::default());
             let mut buffer = buffer.make_mut().expect("Could not swap buffer protection modes");
 
+            
+            #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+            buffer.jit_writable();
             // update buffer and length
             buffer.set_len(new_asmoffset);
             buffer[old_asmoffset..].copy_from_slice(new);
@@ -166,6 +176,9 @@ impl MemoryManager {
             cache_control::synchronize_icache(&buffer[old_asmoffset .. ]);
 
             // repack the buffer
+            #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+            buffer.jit_executable();
+
             let buffer = buffer.make_exec().expect("Could not swap buffer protection modes");
             *lock = buffer;
         }

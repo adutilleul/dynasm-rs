@@ -15,7 +15,7 @@ license.workspace = true
 
 
 [dependencies]
-memmap2 = "0.9.5"
+memmap2 = { git = "https://github.com/adutilleul/memmap2-rs.git"}
 byteorder = "1.5.0"
 fnv = "1.0.7"
 dynasm = { version = "=3.2.0", path = "../plugin" }

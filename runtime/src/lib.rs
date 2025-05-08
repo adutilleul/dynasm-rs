@@ -607,6 +607,9 @@ impl<R: Relocation> Assembler<R> {
         let buffer = mem::replace(&mut *lock, ExecutableBuffer::default());
         let mut buffer = buffer.make_mut().expect("Could not swap buffer protection modes");
 
+        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+        buffer.jit_writable();
+
         // construct the modifier
         let mut modifier = Modifier {
             asmoffset: 0,
@@ -617,7 +620,7 @@ impl<R: Relocation> Assembler<R> {
             relocs: &mut self.relocs,
             old_managed: &mut self.managed,
             new_managed: ManagedRelocs::new(),
-
+ 
             error: None
         };
 
@@ -626,6 +629,9 @@ impl<R: Relocation> Assembler<R> {
 
         // flush any changes made by the user code to the buffer
         modifier.encode_relocs()?;
+
+        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+        buffer.jit_executable();
 
         // repack the buffer
         let buffer = buffer.make_exec().expect("Could not swap buffer protection modes");
@@ -642,6 +648,7 @@ impl<R: Relocation> Assembler<R> {
 
         let managed = &self.managed;
         let error = &mut self.error;
+
 
         self.memory.commit(&mut self.ops, |buffer, old_addr, new_addr| {
             let change = new_addr.wrapping_sub(old_addr) as isize;

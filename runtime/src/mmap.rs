@@ -4,7 +4,7 @@
 use std::ops::{Deref, DerefMut};
 use std::io;
 
-use memmap2::{Mmap, MmapMut};
+use memmap2::{Mmap, MmapMut, MmapOptions};
 
 use crate::AssemblyOffset;
 
@@ -51,7 +51,7 @@ impl ExecutableBuffer {
         let buffer = if size == 0 {
             None
         } else {
-            Some(MmapMut::map_anon(size)?.make_exec()?)
+            Some(MmapOptions::new().jit().len(size).map_anon()?.make_exec()?)
         };
 
         Ok(ExecutableBuffer {
@@ -87,7 +87,7 @@ impl MutableBuffer {
         let buffer = if size == 0 {
             None
         } else {
-            Some(MmapMut::map_anon(size)?)
+            Some(MmapOptions::new().jit().len(size).map_anon()?)
         };
 
         Ok(MutableBuffer {
@@ -106,6 +106,34 @@ impl MutableBuffer {
     pub fn set_len(&mut self, length: usize) {
         self.length = length
     }
+
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    /// Make the buffer writable for the current MacOS thread to avoid reuse from the 
+    /// previous one
+    pub fn jit_writable(&self) {
+        extern "C" {
+            fn pthread_jit_write_protect_np(value: std::ffi::c_int);
+        }
+    
+        unsafe {
+            pthread_jit_write_protect_np(0);
+        }
+    }
+
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    /// Make the buffer executable for the current MacOS thread to properly commit 
+    /// the modifications made to it.
+    pub fn jit_executable(&self) {
+        extern "C" {
+            fn pthread_jit_write_protect_np(value: std::ffi::c_int);
+        }
+    
+        unsafe {
+            pthread_jit_write_protect_np(1);
+        }
+    }
+    
+    
 
     /// Change this mutable buffer into an executable buffer.
     pub fn make_exec(self) -> io::Result<ExecutableBuffer> {

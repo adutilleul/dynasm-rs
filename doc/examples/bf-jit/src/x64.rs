@@ -206,15 +206,15 @@ impl Program {
 }
 
 impl<'a> State<'a> {
-    unsafe extern "win64" fn getchar(state: *mut State, cell: *mut u8) -> u8 {
-        let state = &mut *state;
+    fn getchar(state: *mut State, cell: *mut u8) -> u8 {
+        let state = unsafe { &mut *state };
         let err = state.output.flush().is_err();
-        (state.input.read_exact(slice::from_raw_parts_mut(cell, 1)).is_err() || err) as u8
+        (state.input.read_exact(unsafe { slice::from_raw_parts_mut(cell, 1) }).is_err() || err) as u8
     }
 
-    unsafe extern "win64" fn putchar(state: *mut State, cell: *mut u8) -> u8 {
-        let state = &mut *state;
-        state.output.write_all(slice::from_raw_parts(cell, 1)).is_err() as u8
+    fn putchar(state: *mut State, cell: *mut u8) -> u8 {
+        let state = unsafe { &mut *state };
+        state.output.write_all(unsafe { slice::from_raw_parts(cell, 1) }).is_err() as u8
     }
 
     fn new(input: Box<dyn BufRead + 'a>, output: Box<dyn Write + 'a>) -> State<'a> {
